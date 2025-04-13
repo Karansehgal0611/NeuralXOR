@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network Visualization</title>
+    
+    <!-- D3.js for visualization -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- Add Bootstrap for styling -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        .node {
+            stroke: #333;
+            stroke-width: 2px;
+        }
+        
+        .link {
+            stroke-width: 2px;
+        }
+        
+        .grid-point {
+            opacity: 0.5;
+        }
+        
+        .data-point {
+            stroke: black;
+            stroke-width: 2px;
+        }
+        
+        svg {
+            border: 1px solid #ddd;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container my-4">
+        <h1 class="text-center mb-4">Neural Network Interactive Visualization</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Training Data (XOR Problem)</h3>
+                    </div>
+                    <div class="card-body">
+                        <svg id="data-svg" width="300" height="300"></svg>
+                        <div class="text-center mt-2">
+                            <p>Blue = 1, Red = 0</p>
+                            <p>XOR: Blue when inputs are different, Red when same</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Network Prediction Boundary</h3>
+                    </div>
+                    <div class="card-body">
+                        <svg id="boundary-svg" width="300" height="300"></svg>
+                        <div class="text-center mt-2">
+                            <p>Loss: <span id="loss">0.0000</span></p>
+                            <p>Epoch: <span id="epoch">0</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Training Controls</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Activation Function:</label>
+                            <select id="activation-function" class="form-select">
+                                <option value="sigmoid">Sigmoid</option>
+                                <option value="relu">ReLU</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Learning Rate:</label>
+                            <input type="range" class="form-range" id="learning-rate" min="0.01" max="0.5" step="0.01" value="0.1">
+                            <p class="text-center" id="learning-rate-value">0.10</p>
+                        </div>
+                        
+                        <button id="train-button" class="btn btn-primary w-100 mb-2">Train Network</button>
+                        <button id="reset-button" class="btn btn-secondary w-100">Reset Weights & Biases</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Neural Network Architecture</h3>
+                    </div>
+                    <div class="card-body overflow-auto">
+                        <svg id="network-svg" width="800" height="400"></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Make a Prediction</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label">Input X1:</label>
+                                <input type="number" class="form-control" id="input-x1" min="0" max="1" step="0.1" value="0.5">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Input X2:</label>
+                                <input type="number" class="form-control" id="input-x2" min="0" max="1" step="0.1" value="0.8">
+                            </div>
+                            <div class="col-md-3">
+                                <button id="predict-button" class="btn btn-success">Predict</button>
+                            </div>
+                            <div class="col-md-3">
+                                <div id="prediction-output" class="p-2 border rounded bg-light" style="display: none;">
+                                    <p class="mb-0"><strong>Prediction: <span id="prediction-value">0.0000</span></strong></p>
+                                    <p class="mb-0 small"><span id="prediction-class"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-12">
+                <button id="toggle-parameters" class="btn btn-light">Show Network Parameters</button>
+                
+                <div id="parameters-container" class="mt-3 p-3 border rounded bg-light" style="display: none;">
+                    <h4>Network Parameters:</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Weights:</h5>
+                            <pre id="weights-display" class="small"></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Biases:</h5>
+                            <pre id="biases-display" class="small"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let networkData;
+        let dataPoints;
+        let gridPoints;
+        let isTraining = false;
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set initial values from server
+            document.getElementById('activation-function').value = "{{ activation }}";
+            document.getElementById('learning-rate').value = "{{ learning_rate }}";
+            document.getElementById('learning-rate-value').textContent = parseFloat("{{ learning_rate }}").toFixed(2);
+            
+            // Update learning rate display when slider changes
+            document.getElementById('learning-rate').addEventListener('input', function() {
+                document.getElementById('learning-rate-value').textContent = parseFloat(this.value).toFixed(2);
+            });
+            
+            // Button event listeners
+            document.getElementById('train-button').addEventListener('click', trainNetwork);
+            document.getElementById('reset-button').addEventListener('click', resetNetwork);
+            document.getElementById('predict-button').addEventListener('click', makePrediction);
+            document.getElementById('toggle-parameters').addEventListener('click', toggleParameters);
+            
+            // Fetch initial data
+            fetchData();
+        });
+        
+        // Fetch all necessary data from the server
+        function fetchData() {
+            Promise.all([
+                fetch('/api/data').then(response => response.json()),
+                fetch('/api/grid').then(response => response.json()),
+                fetch('/api/network').then(response => response.json())
+            ]).then(([data, grid, network]) => {
+                dataPoints = data;
+                gridPoints = grid;
+                networkData = network;
+                
+                // Update UI
+                document.getElementById('loss').textContent = networkData.loss.toFixed(4);
+                document.getElementById('epoch').textContent = networkData.epoch;
+                
+                // Visualize
+                visualizeData();
+                visualizeDecisionBoundary();
+                visualizeNetwork();
+                
+                // Display parameters
+                displayParameters();
+            });
+        }
+        
+        // Train the network
+        function trainNetwork() {
+            if (isTraining) return;
+            
+            isTraining = true;
+            document.getElementById('train-button').textContent = 'Training...';
+            document.getElementById('train-button').disabled = true;
+            
+            const activationFunction = document.getElementById('activation-function').value;
+            const learningRate = parseFloat(document.getElementById('learning-rate').value);
+            
+            fetch('/api/train', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    activation: activationFunction,
+                    learning_rate: learningRate
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loss').textContent = data.loss.toFixed(4);
+                document.getElementById('epoch').textContent = data.epoch;
+                
+                // Refresh data
+                fetchData();
+                
+                isTraining = false;
+                document.getElementById('train-button').textContent = 'Train Network';
+                document.getElementById('train-button').disabled = false;
+            });
+        }
+        
+        // Reset network weights and biases
+        function resetNetwork() {
+            fetch('/api/reset', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                fetchData();
+            });
+        }
+        
+        // Make a prediction
+        function makePrediction() {
+            const x1 = parseFloat(document.getElementById('input-x1').value);
+            const x2 = parseFloat(document.getElementById('input-x2').value);
+            
+            fetch('/api/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    x1: x1,
+                    x2: x2
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const predictionValue = data.output;
+                document.getElementById('prediction-value').textContent = predictionValue.toFixed(4);
+                document.getElementById('prediction-class').textContent = 
+                    predictionValue > 0.5 ? '1 (Blue)' : '0 (Red)';
+                document.getElementById('prediction-output').style.display = 'block';
+            });
+        }
+        
+        // Toggle network parameters display
+        function toggleParameters() {
+            const container = document.getElementById('parameters-container');
+            const button = document.getElementById('toggle-parameters');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                button.textContent = 'Hide Network Parameters';
+                displayParameters();
+            } else {
+                container.style.display = 'none';
+                button.textContent = 'Show Network Parameters';
+            }
+        }
+        
+        // Display network parameters
+        function displayParameters() {
+            if (networkData) {
+                document.getElementById('weights-display').textContent = JSON.stringify(networkData.weights, null, 2);
+                document.getElementById('biases-display').textContent = JSON.stringify(networkData.biases, null, 2);
+            }
+        }
+        
+        // Visualize training data
+        function visualizeData() {
+            const svg = d3.select('#data-svg');
+            svg.selectAll('*').remove();
+            
+            const width = 300;
+            const height = 300;
+            const padding = 30;
+            
+            // Create scales
+            const xScale = d3.scaleLinear()
+                .domain([0, 1])
+                .range([padding, width - padding]);
+            
+            const yScale = d3.scaleLinear()
+                .domain([0, 1])
+                .range([height - padding, padding]);
+            
+            // Draw axes
+            const xAxis = d3.axisBottom(xScale);
+            const yAxis = d3.axisLeft(yScale);
+            
+            svg.append('g')
+                .attr('transform', `translate(0, ${height - padding})`)
+                .call(xAxis);
+            
+            svg.append('g')
+                .attr('transform', `translate(${padding}, 0)`)
+                .call(yAxis);
+            
+            // Draw data points
+            svg.selectAll('circle')
+                .data(dataPoints)
+                .enter()
+                .append('circle')
+                .attr('cx', d => xScale(d.x))
+                .attr('cy', d => yScale(d.y))
+                .attr('r', 5)
+                .attr('class', 'data-point')
+                .attr('fill', d => d.z > 0.5 ? 'blue' : 'red');
+            
+            // Add title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', padding / 2)
+                .attr('text-anchor', 'middle')
+                .attr('font-weight', 'bold')
+                .text('XOR Data Visualization');
+            
+            // Add labels
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', height - 5)
+                .attr('text-anchor', 'middle')
+                .text('X');
+            
+            svg.append('text')
+                .attr('transform', 'rotate(-90)')
+                .attr('x', -height / 2)
+                .attr('y', 15)
+                .attr('text-anchor', 'middle')
+                .text('Y');
+        }
+        
+        // Visualize decision boundary
+        function visualizeDecisionBoundary() {
+            if (!gridPoints) return;
+            
+            const svg = d3.select('#boundary-svg');
+            svg.selectAll('*').remove();
+            
+            const width = 300;
+            const height = 300;
+            const padding = 30;
+            
+            // Create scales
+            const xScale = d3.scaleLinear()
+                .domain([0, 1])
+                .range([padding, width - padding]);
+            
+            const yScale = d3.scaleLinear()
+                .domain([0, 1])
+                .range([height - padding, padding]);
+            
+            // Draw axes
+            const xAxis = d3.axisBottom(xScale);
+            const yAxis = d3.axisLeft(yScale);
+            
+            svg.append('g')
+                .attr('transform', `translate(0, ${height - padding})`)
+                .call(xAxis);
+            
+            svg.append('g')
+                .attr('transform', `translate(${padding}, 0)`)
+                .call(yAxis);
+            
+            // Determine grid dimensions
+            const resolution = Math.sqrt(gridPoints.length);
+            const cellWidth = (width - 2 * padding) / resolution;
+            const cellHeight = (height - 2 * padding) / resolution;
+            
+            // Draw decision boundary
+            svg.selectAll('rect.grid')
+                .data(gridPoints)
+                .enter()
+                .append('rect')
+                .attr('class', 'grid-point')
+                .attr('x', d => xScale(d.x) - cellWidth / 2)
+                .attr('y', d => yScale(d.y) - cellHeight / 2)
+                .attr('width', cellWidth)
+                .attr('height', cellHeight)
+                .attr('fill', d => d.prediction > 0.5 ? 'blue' : 'red');
+            
+            // Draw data points
+            svg.selectAll('circle')
+                .data(dataPoints)
+                .enter()
+                .append('circle')
+                .attr('cx', d => xScale(d.x))
+                .attr('cy', d => yScale(d.y))
+                .attr('r', 3)
+                .attr('fill', 'black')
+                .attr('stroke', d => d.z > 0.5 ? 'blue' : 'red')
+                .attr('stroke-width', 2);
+            
+            // Add title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', padding / 2)
+                .attr('text-anchor', 'middle')
+                .attr('font-weight', 'bold')
+                .text('Decision Boundary');
+            
+            // Add labels
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', height - 5)
+                .attr('text-anchor', 'middle')
+                .text('X');
+            
+            svg.append('text')
+                .attr('transform', 'rotate(-90)')
+                .attr('x', -height / 2)
+                .attr('y', 15)
+                .attr('text-anchor', 'middle')
+                .text('Y');
+        }
+        
+        // Visualize neural network
+        function visualizeNetwork() {
+            if (!networkData) return;
+            
+            const svg = d3.select('#network-svg');
+            svg.selectAll('*').remove();
+            
+            const width = 800;
+            const height = 400;
+            const padding = 50;
+            
+            // Extract layer sizes
+            const layers = networkData.layers;
+            const numLayers = layers.length;
+            
+            // Calculate positions for nodes
+            const layerSpacing = (width - 2 * padding) / (numLayers - 1);
+            const nodeData = [];
+            const linkData = [];
+            
+            // Generate node data
+            for (let i = 0; i < numLayers; i++) {
+                const layerSize = layers[i];
+                const nodeSpacing = (height - 2 * padding) / (layerSize - 1 || 1);
+                
+                for (let j = 0; j < layerSize; j++) {
+                    const x = padding + i * layerSpacing;
+                    const y = layerSize === 1 ? height / 2 : padding + j * nodeSpacing;
+                    
+                    nodeData.push({
+                        id: `${i}-${j}`,
+                        x: x,
+                        y: y,
+                        layer: i,
+                        index: j,
+                        type: i === 0 ? 'input' : (i === numLayers - 1 ? 'output' : 'hidden')
+                    });
+                }
+            }
+            
+            // Generate link data and assign weights
+            for (let i = 0; i < numLayers - 1; i++) {
+                const sourceLayer = i;
+                const targetLayer = i + 1;
+                
+                const sourceNodes = nodeData.filter(node => node.layer === sourceLayer);
+                const targetNodes = nodeData.filter(node => node.layer === targetLayer);
+                
+                for (let j = 0; j < sourceNodes.length; j++) {
+                    for (let k = 0; k < targetNodes.length; k++) {
+                        // Get weight for this connection
+                        const weight = networkData.weights[i][k][j];
+                        const weightAbs = Math.abs(weight);
+                        
+                        linkData.push({
+                            source: sourceNodes[j],
+                            target: targetNodes[k],
+                            weight: weight,
+                            weightAbs: weightAbs
+                        });
+                    }
+                }
+            }
+            
+            // Define color scale for weights
+            const colorScale = d3.scaleLinear()
+                .domain([-1, 0, 1])
+                .range(['red', '#ccc', 'blue']);
+            
+            // Define width scale for weights
+            const widthScale = d3.scaleLinear()
+                .domain([0, 1])
+                .range([1, 5]);
+            
+            // Draw links
+            svg.selectAll('line')
+                .data(linkData)
+                .enter()
+                .append('line')
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y)
+                .attr('stroke', d => colorScale(d.weight))
+                .attr('stroke-width', d => widthScale(d.weightAbs))
+                .attr('class', 'link');
+            
+            // Draw nodes
+            const nodeGroups = svg.selectAll('g.node')
+                .data(nodeData)
+                .enter()
+                .append('g')
+                .attr('class', 'node')
+                .attr('transform', d => `translate(${d.x}, ${d.y})`);
+            
+            // Add node circles
+            nodeGroups.append('circle')
+                .attr('r', 15)
+                .attr('fill', d => {
+                    if (d.type === 'input') return '#90EE90'; // Light green
+                    if (d.type === 'output') return '#ADD8E6'; // Light blue
+                    return '#FFFFE0'; // Light yellow for hidden
+                })
+                .attr('class', 'node');
+            
+            // Add node labels
+            nodeGroups.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', '0.3em')
+                .text(d => {
+                    if (d.type === 'input') return `X${d.index + 1}`;
+                    if (d.type === 'output') return 'Y';
+                    return `H${d.index + 1}`;
+                })
+                .attr('font-size', '11px')
+                .attr('font-weight', 'bold');
+            
+            // Add biases to hidden and output nodes
+            nodeGroups.filter(d => d.type !== 'input')
+                .append('text')
+                .attr('text-anchor', 'middle')
+                .attr('y', -20)
+                .attr('font-size', '8px')
+                .text(d => {
+                    const bias = networkData.biases[d.layer - 1][d.index];
+                    return `b: ${bias.toFixed(2)}`;
+                });
+            
+            // Add layer labels
+            for (let i = 0; i < numLayers; i++) {
+                svg.append('text')
+                    .attr('x', padding + i * layerSpacing)
+                    .attr('y', height - 10)
+                    .attr('text-anchor', 'middle')
+                    .attr('font-weight', 'bold')
+                    .text(i === 0 ? 'Input Layer' : (i === numLayers - 1 ? 'Output Layer' : `Hidden Layer ${i}`));
+            }
+            
+            // Add legend for weights
+            const legendX = width - 130;
+            const legendY = 30;
+            
+            svg.append('text')
+                .attr('x', legendX)
+                .attr('y', legendY - 15)
+                .attr('font-weight', 'bold')
+                .text('Weight Legend:');
+            
+            // Create legend for link colors
+            const legendColors = [-1, 0, 1];
+            const legendLabels = ['Negative', 'Zero', 'Positive'];
+            
+            for (let i = 0; i < legendColors.length; i++) {
+                svg.append('line')
+                    .attr('x1', legendX)
+                    .attr('y1', legendY + i * 20)
+                    .attr('x2', legendX + 30)
+                    .attr('y2', legendY + i * 20)
+                    .attr('stroke', colorScale(legendColors[i]))
+                    .attr('stroke-width', widthScale(Math.abs(legendColors[i])));
+                
+                svg.append('text')
+                    .attr('x', legendX + 40)
+                    .attr('y', legendY + i * 20 + 4)
+                    .attr('font-size', '10px')
+                    .text(legendLabels[i]);
+            }
+            
+            // Add title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', 20)
+                .attr('text-anchor', 'middle')
+                .attr('font-weight', 'bold')
+                .attr('font-size', '14px')
+                .text(`Neural Network Architecture (${layers.join('-')})`);
+            
+            // Add activation function label
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', 40)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '12px')
+                .text(`Activation: ${networkData.activation || 'sigmoid'} | Learning Rate: ${networkData.learning_rate || 0.1}`);
+        }
+    </script>
+</body>
+</html>
