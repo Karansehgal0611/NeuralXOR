@@ -8,7 +8,7 @@
 
 ## 📦 Project Structure
 ```
-BasicNN/
+NeuralXOR/
 ├── app.py # Flask web interface
 ├── BasicNN.py # Core neural network class
 ├── generate.py # Visualization generator
@@ -16,9 +16,9 @@ BasicNN/
 ├── templates/ # Web UI templates
 │ └── index.html
 └── visualisations/ # Generated plots
-├── decision_boundary.png
-├── network_graph.png
-└── training_progress.png
+  └── decision_boundary.png
+  └──network_graph.png
+  └── training_progress.png
 ```
 
 ## 🌟 Key Features
@@ -47,17 +47,15 @@ source venv/bin/activate  # Linux/Mac
 
 ## 🧠 Neural Network Details
 
-## 🧠 Neural Network Details
-
 ### Architecture
 ```python
 [Input(2)] → [Hidden(4), sigmoid] → [Output(1), sigmoid]
 Training Parameters
-Parameter    	  Value	     Description
-Learning Rate	  0.5	       Controls weight update step size
-Loss Function	  MSE	       Mean Squared Error
-Batch Size	    4	         Full-batch training for XOR
-Epochs	        5000	     Typical training iterations needed
+Parameter    	   Value	     Description
+Learning Rate	   0.5	       Controls weight update step size
+Loss Function	   MSE	       Mean Squared Error
+Batch Size	     4	         Full-batch training for XOR
+Epochs	         5000	     Typical training iterations needed
 ```
 ##  🛠 Development
 Dependencies
