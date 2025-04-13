@@ -1,6 +1,6 @@
 # XOR NN 🧠⚡
 
-**A Minimalist Neural Network Implementation for XOR Problem with Visualizations**
+**A Minimalist Neural Network Implementation for XOR Problem with Visualizations from SCRATCH**
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-blue?logo=python)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-2.0-lightgrey?logo=flask)](https://flask.palletsprojects.com/)
